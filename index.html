@@ -1,0 +1,589 @@
+<meta name='viewport' content='width=device-width, initial-scale=1'/><!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Дишка Кликер: Мемный Путь</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Comic Sans MS', 'Segoe UI', cursive, sans-serif; user-select: none; -webkit-tap-highlight-color: transparent; }
+        
+        body {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+            background-color: #000;
+            background-size: cover;
+            background-position: center;
+            transition: background-image 0.5s ease-in-out;
+        }
+
+        /* --- ДЕРЕВЕНСКИЙ ДЕКОР (Только для 1 уровня) --- */
+        #village-decor {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+            transition: opacity 0.5s;
+        }
+        .sun { position: absolute; top: 20px; right: 20px; font-size: 60px; animation: spin 10s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .cloud { position: absolute; font-size: 50px; opacity: 0.8; animation: floatCloud 20s linear infinite; }
+        .cloud:nth-child(2) { top: 10%; left: -10%; animation-duration: 25s; }
+        .cloud:nth-child(3) { top: 25%; left: -20%; animation-duration: 30s; font-size: 40px; }
+        .cloud:nth-child(4) { top: 5%; left: -30%; animation-duration: 22s; font-size: 70px; }
+        @keyframes floatCloud { 0% { transform: translateX(0); } 100% { transform: translateX(120vw); } }
+        .cow { position: absolute; bottom: 10px; font-size: 40px; animation: walk 15s linear infinite alternate; }
+        .cow:nth-child(5) { left: 10%; animation-duration: 20s; }
+        .cow:nth-child(6) { right: 20%; bottom: 30px; animation-duration: 18s; }
+        @keyframes walk { 0% { transform: translateX(0) scaleX(1); } 50% { transform: translateX(50px) scaleX(1); } 100% { transform: translateX(0) scaleX(-1); } }
+
+        /* --- ИНТЕРФЕЙС --- */
+        .game-ui {
+            position: relative;
+            z-index: 10;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .coins-display {
+            font-size: 36px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            animation: bounce 2s infinite;
+            background: rgba(0,0,0,0.4);
+            padding: 10px 25px;
+            border-radius: 20px;
+            border: 2px solid #fff;
+        }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+
+        /* Главная кнопка (Дишка) */
+        .dishka-container {
+            position: relative;
+            width: 260px;
+            height: 260px;
+            border-radius: 50%;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.1s;
+            background: #fff;
+            margin-bottom: 20px;
+        }
+        .dishka-container:active { transform: scale(0.92); }
+        .dishka-container img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+        /* Уровень и XP */
+        .level-box {
+            background: rgba(255, 255, 255, 0.85);
+            border-radius: 20px;
+            padding: 10px 20px;
+            width: 80%;
+            max-width: 300px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+            border: 3px solid #FF4500;
+            backdrop-filter: blur(5px);
+        }
+        .level-text { font-size: 20px; font-weight: bold; color: #FF4500; margin-bottom: 5px; text-transform: uppercase; }
+        .xp-bar-bg { width: 100%; height: 15px; background: #ddd; border-radius: 10px; overflow: hidden; border: 2px solid #333; }
+        .xp-bar-fill { height: 100%; background: linear-gradient(90deg, #FF4500, #FFD700); width: 0%; transition: width 0.2s; }
+        .xp-text { font-size: 12px; color: #333; margin-top: 5px; font-weight: bold; }
+
+        /* Кнопка улучшений */
+        .upgrade-btn {
+            position: fixed; bottom: 30px; right: 20px;
+            background: #FF4500; color: #fff; border: 3px solid #fff;
+            border-radius: 50%; width: 70px; height: 70px; font-size: 30px;
+            cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            z-index: 100; display: flex; justify-content: center; align-items: center;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+        .upgrade-btn:active { transform: scale(0.9); }
+
+        /* --- МОДАЛЬНОЕ ОКНО --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); display: none;
+            justify-content: center; align-items: center; z-index: 1000; padding: 20px;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-content {
+            background: #fff; border-radius: 20px; width: 100%; max-width: 400px;
+            max-height: 80vh; overflow-y: auto; padding: 20px;
+            border: 5px solid #FF4500; box-shadow: 0 0 50px rgba(255, 69, 0, 0.5);
+            position: relative;
+        }
+        .modal-title { text-align: center; font-size: 24px; color: #FF4500; margin-bottom: 20px; text-transform: uppercase; border-bottom: 3px dashed #ccc; padding-bottom: 10px; }
+        .close-btn { position: absolute; top: 10px; right: 15px; font-size: 30px; color: #333; cursor: pointer; background: none; border: none; font-weight: bold; }
+        
+        .upgrade-item {
+            background: #f9f9f9; border: 2px solid #ddd; border-radius: 15px;
+            padding: 15px; margin-bottom: 15px; display: flex;
+            justify-content: space-between; align-items: center; cursor: pointer; transition: 0.2s;
+        }
+        .upgrade-item:active { transform: scale(0.98); }
+        .upgrade-item.disabled { opacity: 0.6; pointer-events: none; }
+        .upgrade-name { font-size: 18px; font-weight: bold; color: #333; }
+        .upgrade-desc { font-size: 14px; color: #666; margin-top: 4px; }
+        .upgrade-cost { font-size: 16px; font-weight: bold; color: #fff; background: #FFD700; padding: 8px 12px; border-radius: 10px; border: 2px solid #B8860B; text-shadow: 1px 1px 0 #B8860B; }
+
+        /* Всплывающий текст */
+        .floating-text {
+            position: absolute; color: #FF4500; font-weight: bold; font-size: 24px;
+            pointer-events: none; animation: floatUp 0.8s ease-out forwards; text-shadow: 2px 2px 0 #fff; z-index: 50;
+        }
+        @keyframes floatUp { 0% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-100px) scale(1.5); } }
+
+        /* --- СКРИМЕР --- */
+        #jumpscare-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 9999; display: none;
+            justify-content: center; align-items: center; overflow: hidden;
+        }
+        #jumpscare-overlay.active { display: flex; }
+
+        .monster-img {
+            width: 100%; height: 100%; object-fit: cover;
+            animation: jumpZoom 0.4s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+            filter: contrast(1.5) brightness(0.8) saturate(1.5);
+        }
+        @keyframes jumpZoom {
+            0% { transform: scale(0.1) rotate(10deg); opacity: 0; filter: blur(10px); }
+            50% { transform: scale(1.2) rotate(-5deg); opacity: 1; filter: blur(0); }
+            100% { transform: scale(1.6) rotate(0deg); opacity: 1; }
+        }
+
+        .red-flash {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: red; z-index: 10000; opacity: 0; pointer-events: none;
+            animation: flashAnim 0.6s;
+        }
+        @keyframes flashAnim { 0%, 100% { opacity: 0; } 30% { opacity: 0.9; } }
+
+        .shake-screen { animation: shake 0.5s infinite; }
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        #game-over-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 10001; display: none;
+            flex-direction: column; justify-content: center; align-items: center;
+            color: red; text-align: center; padding: 20px;
+        }
+        #game-over-screen.active { display: flex; }
+        .game-over-title { font-size: 40px; text-shadow: 0 0 20px red; margin-bottom: 20px; font-weight: bold; }
+        .restart-btn {
+            padding: 15px 40px; font-size: 18px; background: transparent;
+            border: 2px solid red; color: red; cursor: pointer; text-transform: uppercase;
+            font-family: inherit; font-weight: bold; box-shadow: 0 0 15px rgba(255,0,0,0.3);
+        }
+        .restart-btn:active { background: red; color: black; }
+
+    </style>
+</head>
+<body>
+
+    <div id="jumpscare-overlay">
+        <img src="https://i.postimg.cc/LXjfjby0/55bc188f3163bec397c0404c0b2d6fdb.jpg" class="monster-img" alt="Monster">
+    </div>
+    <div class="red-flash" id="redFlash" style="display:none;"></div>
+
+    <div id="game-over-screen">
+        <div class="game-over-title">ТЫ ДОШЁЛ ДО КОНЦА...</div>
+        <p style="color:#888; margin-bottom:30px; max-width:300px; font-family:'Courier New', monospace;">Но монстр забрал Дишку. Игра окончена.</p>
+        <button class="restart-btn" onclick="location.reload()">НАЧАТЬ ЗАНОВО</button>
+    </div>
+
+    <div id="village-decor">
+        <div class="sun">☀️</div>
+        <div class="cloud">☁️</div>
+        <div class="cloud">☁️</div>
+        <div class="cloud">☁️</div>
+        <div class="cow">🐄</div>
+        <div class="cow">🐄</div>
+    </div>
+
+    <div class="game-ui">
+        <div class="coins-display">💰 <span id="coinsDisplay">0</span></div>
+        <div class="dishka-container" id="dishkaContainer" onclick="clickDishka(event)">
+            <img id="dishkaImg" src="https://i.postimg.cc/VNg2zzQ7/IMG-20261024-222716-925.jpg" alt="Дишка">
+        </div>
+        <div class="level-box">
+            <div class="level-text">Уровень <span id="levelDisplay">1</span></div>
+            <div class="xp-bar-bg"><div class="xp-bar-fill" id="xpBar"></div></div>
+            <div class="xp-text" id="xpText">0 / 500 XP</div>
+        </div>
+    </div>
+
+    <button class="upgrade-btn" onclick="openUpgrades()">🛠️</button>
+
+    <div class="modal-overlay" id="upgradeModal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="closeUpgrades()">×</button>
+            <div class="modal-title">Улучшения</div>
+            <div id="upgradeList"></div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // ДАННЫЕ
+        // ==========================================
+        
+        const dishkaPhotos = [
+            "https://i.postimg.cc/VNg2zzQ7/IMG-20261024-222716-925.jpg", // 1
+            "https://i.postimg.cc/vZWpSWP9/IMG-20261024-222716-909.jpg", // 2
+            "https://i.postimg.cc/d3pzgnP8/IMG-20261024-222716-972.jpg", // 3
+            "https://i.postimg.cc/4NhCpCVF/IMG-20261024-222716-934.jpg"  // 4
+        ];
+
+        const backgrounds = [
+            "https://i.postimg.cc/9M6fYd8P/e28c06936f8b17a27a2583f766c8926e.jpg", // Деревня
+            "https://i.postimg.cc/KzkzTqNK/1574b927f173f8f4d25eb1f05ab93294.jpg", // Подъезд
+            "https://i.postimg.cc/3wbNd52S/0879328ebf9b13e0019f06497071f019.jpg", // Мусорка
+            "https://i.postimg.cc/dV6LcT3T/86ee363c022bc1194f0ba7d9a548119c.jpg"  // 4-й фон
+        ];
+
+        // Требования для уровней (XP)
+        const levelRequirements = [0, 500, 1500, 3000]; 
+
+        const upgradesData = [
+            { id: 'click1', name: '👆 Мощный палец', desc: '+1 к силе клика', cost: 50, type: 'click', power: 1, bought: false },
+            { id: 'click2', name: '📱 Новый телефон', desc: '+5 к силе клика', cost: 500, type: 'click', power: 5, bought: false },
+            { id: 'auto1', name: '👦 Пашка-помощник', desc: '+1 монета в секунду', cost: 200, type: 'auto', power: 1, bought: false },
+            { id: 'auto2', name: '💪 Мишаня', desc: '+5 монет в секунду', cost: 1000, type: 'auto', power: 5, bought: false },
+            { id: 'click3', name: '📷 Профи-камера', desc: '+20 к силе клика', cost: 5000, type: 'click', power: 20, bought: false },
+            { id: 'auto3', name: '🎤 Битбоксер', desc: '+20 монет в секунду', cost: 10000, type: 'auto', power: 20, bought: false }
+        ];
+
+        let game = {
+            coins: 0,
+            xp: 0,
+            level: 1,
+            clickPower: 1,
+            autoIncome: 0,
+            currentPhotoIndex: 0,
+            isGameOver: false
+        };
+
+        // ==========================================
+        // АУДИО
+        // ==========================================
+        let audioCtx;
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function playClickSound() {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(600 + Math.random() * 200, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        }
+
+        function playScreamSound() {
+            if (!audioCtx) return;
+            const masterGain = audioCtx.createGain();
+            masterGain.gain.value = 1.0; 
+            masterGain.connect(audioCtx.destination);
+
+            const compressor = audioCtx.createDynamicsCompressor();
+            compressor.threshold.value = -20;
+            compressor.knee.value = 40;
+            compressor.ratio.value = 12;
+            compressor.attack.value = 0.01;
+            compressor.release.value = 0.25;
+            compressor.connect(masterGain);
+
+            const osc1 = audioCtx.createOscillator();
+            const gain1 = audioCtx.createGain();
+            osc1.type = 'sawtooth';
+            osc1.frequency.setValueAtTime(80, audioCtx.currentTime);
+            osc1.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 2);
+            gain1.gain.setValueAtTime(0.8, audioCtx.currentTime);
+            gain1.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 2);
+            osc1.connect(gain1);
+            gain1.connect(compressor);
+            osc1.start();
+            osc1.stop(audioCtx.currentTime + 2);
+
+            const osc2 = audioCtx.createOscillator();
+            const gain2 = audioCtx.createGain();
+            osc2.type = 'square';
+            osc2.frequency.setValueAtTime(1200, audioCtx.currentTime);
+            osc2.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 1.5);
+            gain2.gain.setValueAtTime(0.5, audioCtx.currentTime);
+            gain2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.5);
+            osc2.connect(gain2);
+            gain2.connect(compressor);
+            osc2.start();
+            osc2.stop(audioCtx.currentTime + 1.5);
+
+            const bufferSize = audioCtx.sampleRate * 2;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+            const noiseGain = audioCtx.createGain();
+            noiseGain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 2);
+            noise.connect(noiseGain);
+            noiseGain.connect(compressor);
+            noise.start();
+
+            if (navigator.vibrate) navigator.vibrate([500, 100, 500, 100, 1000, 200, 1000, 500, 1000]);
+        }
+
+        // ==========================================
+        // ЛОГИКА
+        // ==========================================
+
+        function loadGame() {
+            const saved = localStorage.getItem('dishkaClickerV4');
+            if (saved) {
+                try {
+                    game = JSON.parse(saved);
+                } catch(e) { console.log("Ошибка загрузки"); }
+            }
+            updateUI();
+            applyBackground();
+        }
+
+        function saveGame() {
+            localStorage.setItem('dishkaClickerV4', JSON.stringify(game));
+        }
+
+        function applyBackground() {
+            let bgIndex = Math.min(game.level - 1, backgrounds.length - 1);
+            document.body.style.backgroundImage = `url('${backgrounds[bgIndex]}')`;
+            
+            const decor = document.getElementById('village-decor');
+            if (game.level === 1) {
+                decor.style.display = 'block';
+            } else {
+                decor.style.display = 'none';
+            }
+        }
+
+        function updateUI() {
+            if (game.isGameOver) return;
+
+            document.getElementById('coinsDisplay').innerText = Math.floor(game.coins);
+            document.getElementById('levelDisplay').innerText = game.level;
+            
+            // Фото
+            let photoIndex = Math.min(game.level - 1, dishkaPhotos.length - 1);
+            if (document.getElementById('dishkaImg').src !== dishkaPhotos[photoIndex]) {
+                 document.getElementById('dishkaImg').src = dishkaPhotos[photoIndex];
+            }
+
+            // XP
+            let currentLevelReq = levelRequirements[game.level - 1] || 0;
+            let nextLevelReq = levelRequirements[game.level] || levelRequirements[levelRequirements.length - 1];
+            
+            let xpInCurrentLevel = game.xp - currentLevelReq;
+            let xpNeededForNext = nextLevelReq - currentLevelReq;
+            
+            let percent = Math.max(0, Math.min((xpInCurrentLevel / xpNeededForNext) * 100, 100));
+            document.getElementById('xpBar').style.width = percent + '%';
+            
+            if (game.level < 4) {
+                document.getElementById('xpText').innerText = `${Math.floor(xpInCurrentLevel)} / ${xpNeededForNext} XP до Ур. ${game.level + 1}`;
+            } else {
+                document.getElementById('xpText').innerText = `МАКСИМАЛЬНЫЙ УРОВЕНЬ`;
+                document.getElementById('xpBar').style.width = '100%';
+            }
+
+            renderUpgrades();
+        }
+
+        function clickDishka(e) {
+            if (game.isGameOver) return;
+            initAudio();
+            playClickSound();
+            
+            game.coins += game.clickPower;
+            game.xp += 10; 
+            
+            checkLevelUp();
+
+            createFloatingText(e, `+${game.clickPower}💰`);
+            
+            const cont = document.getElementById('dishkaContainer');
+            cont.style.transform = 'scale(0.95)';
+            setTimeout(() => cont.style.transform = 'scale(1)', 50);
+
+            updateUI();
+            saveGame();
+        }
+
+        function checkLevelUp() {
+            if (game.isGameOver) return;
+            
+            // Проверяем, не перешли ли мы на новый уровень
+            let nextLevelReq = levelRequirements[game.level];
+            if (nextLevelReq !== undefined && game.xp >= nextLevelReq) {
+                game.level++;
+                
+                // ЕСЛИ ДОСТИГЛИ 4 УРОВНЯ
+                if (game.level === 4) {
+                    applyBackground(); // Сначала меняем фон
+                    triggerJumpscare(); // Потом скример
+                    return;
+                }
+                
+                applyBackground();
+                updateUI();
+            }
+        }
+
+        function triggerJumpscare() {
+            game.isGameOver = true;
+            saveGame();
+
+            document.querySelector('.game-ui').style.display = 'none';
+            document.querySelector('.upgrade-btn').style.display = 'none';
+            document.querySelector('.modal-overlay').classList.remove('active');
+
+            const overlay = document.getElementById('jumpscare-overlay');
+            overlay.classList.add('active');
+            
+            const flash = document.getElementById('redFlash');
+            flash.style.display = 'block';
+            setTimeout(() => flash.style.display = 'none', 600);
+
+            document.body.classList.add('shake-screen');
+
+            initAudio();
+            setTimeout(() => playScreamSound(), 50);
+
+            setTimeout(() => {
+                overlay.classList.remove('active');
+                document.body.classList.remove('shake-screen');
+                document.getElementById('game-over-screen').classList.add('active');
+            }, 2500);
+        }
+
+        function openUpgrades() {
+            if (game.isGameOver) return;
+            document.getElementById('upgradeModal').classList.add('active');
+            renderUpgrades();
+        }
+
+        function closeUpgrades() {
+            document.getElementById('upgradeModal').classList.remove('active');
+        }
+
+        function renderUpgrades() {
+            if (game.isGameOver) return;
+            const list = document.getElementById('upgradeList');
+            list.innerHTML = '';
+
+            upgradesData.forEach(upg => {
+                const isBought = upg.bought;
+                const canAfford = game.coins >= upg.cost;
+                
+                const div = document.createElement('div');
+                div.className = `upgrade-item ${isBought || !canAfford ? 'disabled' : ''}`;
+                
+                div.innerHTML = `
+                    <div class="upgrade-info">
+                        <div class="upgrade-name">${upg.name} ${isBought ? '✅' : ''}</div>
+                        <div class="upgrade-desc">${upg.desc}</div>
+                    </div>
+                    <div class="upgrade-cost">${isBought ? 'КУПЛЕНО' : upg.cost + ' 💰'}</div>
+                `;
+
+                if (!isBought) {
+                    div.onclick = () => buyUpgrade(upg);
+                }
+
+                list.appendChild(div);
+            });
+        }
+
+        function buyUpgrade(upg) {
+            if (game.isGameOver) return;
+            if (game.coins >= upg.cost && !upg.bought) {
+                game.coins -= upg.cost;
+                upg.bought = true;
+
+                if (upg.type === 'click') game.clickPower += upg.power;
+                else if (upg.type === 'auto') game.autoIncome += upg.power;
+
+                updateUI();
+                saveGame();
+            }
+        }
+
+        function createFloatingText(e, text) {
+            const el = document.createElement('div');
+            el.className = 'floating-text';
+            el.innerText = text;
+            
+            let x, y;
+            if (e.type === 'touchstart' && e.touches.length > 0) {
+                x = e.touches[0].clientX;
+                y = e.touches[0].clientY;
+            } else {
+                x = e.clientX;
+                y = e.clientY;
+            }
+            
+            el.style.left = (x - 20) + 'px';
+            el.style.top = (y - 30) + 'px';
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 800);
+        }
+
+        // Автодоход
+        setInterval(() => {
+            if (game.autoIncome > 0 && !game.isGameOver) {
+                game.coins += game.autoIncome;
+                game.xp += game.autoIncome; 
+                checkLevelUp();
+                updateUI();
+                saveGame();
+            }
+        }, 1000);
+
+        // Запуск
+        loadGame();
+
+    </script>
+</body>
+</html>
